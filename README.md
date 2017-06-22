@@ -110,9 +110,13 @@ in case of text
 
 ``mime_type`` : ``string``
 
-``data`` : ``string`` for ``text/*``, ``number`` for other types 
+``data`` : ``string``
 
-additionally, in case of blob
+in case of blob
+
+``mime_type`` : ``string``
+
+``data`` : ``number`` element number in the blob array  
 
 ``filename`` : ``string``
 
