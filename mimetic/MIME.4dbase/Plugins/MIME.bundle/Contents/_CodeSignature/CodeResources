@@ -4,6 +4,18 @@
 <dict>
 	<key>files</key>
 	<dict>
+		<key>Resources/COPYING (iconv)</key>
+		<data>
+		hiS82uVbru8AzRHV38+mD2hxCgI=
+		</data>
+		<key>Resources/COPYING (jaromail)</key>
+		<data>
+		hiS82uVbru8AzRHV38+mD2hxCgI=
+		</data>
+		<key>Resources/COPYING (mimetic)</key>
+		<data>
+		2ZV7W9s4Jq+ym5lN04j0gcT36Bw=
+		</data>
 		<key>Resources/Documentation/images/Field_0.png</key>
 		<data>
 		tiDJoel4B9Su5Vc6F5vwnss1hxA=
@@ -105,6 +117,10 @@
 			<key>optional</key>
 			<true/>
 		</dict>
+		<key>Resources/LICENSE(mimetic)</key>
+		<data>
+		rFAGYM+HQvziPY12EI1JdpChTzU=
+		</data>
 		<key>Resources/constants.xlf</key>
 		<data>
 		UbZYnK1QdI2HA5cO0/aNT2a+ucQ=
@@ -130,6 +146,39 @@
 			<key>hash2</key>
 			<data>
 			98jKbUnZvoNXKS37m5JUoBfuRCxC2JzhKP+uHKV6WFc=
+			</data>
+		</dict>
+		<key>Resources/COPYING (iconv)</key>
+		<dict>
+			<key>hash</key>
+			<data>
+			hiS82uVbru8AzRHV38+mD2hxCgI=
+			</data>
+			<key>hash2</key>
+			<data>
+			jOtLnuWt7d5Hsx6XXB2QxzrSe2sWWh3NgMfFRetluQM=
+			</data>
+		</dict>
+		<key>Resources/COPYING (jaromail)</key>
+		<dict>
+			<key>hash</key>
+			<data>
+			hiS82uVbru8AzRHV38+mD2hxCgI=
+			</data>
+			<key>hash2</key>
+			<data>
+			jOtLnuWt7d5Hsx6XXB2QxzrSe2sWWh3NgMfFRetluQM=
+			</data>
+		</dict>
+		<key>Resources/COPYING (mimetic)</key>
+		<dict>
+			<key>hash</key>
+			<data>
+			2ZV7W9s4Jq+ym5lN04j0gcT36Bw=
+			</data>
+			<key>hash2</key>
+			<data>
+			UkJ+X16Rmwqb4dV+hE8OUDptgzqtve3Pi9p3s3HtP/Y=
 			</data>
 		</dict>
 		<key>Resources/Documentation/images/Field_0.png</key>
@@ -398,6 +447,17 @@
 			<key>optional</key>
 			<true/>
 		</dict>
+		<key>Resources/LICENSE(mimetic)</key>
+		<dict>
+			<key>hash</key>
+			<data>
+			rFAGYM+HQvziPY12EI1JdpChTzU=
+			</data>
+			<key>hash2</key>
+			<data>
+			cpSueXXEFi3P+WUo0bnzGrPnDcIHEdc0wKmLHeMuYzU=
+			</data>
+		</dict>
 		<key>Resources/constants.xlf</key>
 		<dict>
 			<key>hash</key>
@@ -413,11 +473,11 @@
 		<dict>
 			<key>hash</key>
 			<data>
-			8WH79l2tgViHfCYSUBu+HCIQ5Es=
+			e5R/+tzxe0QmvLeXHlGzrQAC0HA=
 			</data>
 			<key>hash2</key>
 			<data>
-			rp5mwPoToTOMBrO5g9ATVRBDkkR1XpJE6MF06FX5mo0=
+			SxFyBxYkEOP0OzchDKdJiDnGrUDwhCq9Q/RVTZl598c=
 			</data>
 		</dict>
 		<key>Windows/MIME.html</key>
@@ -435,11 +495,11 @@
 		<dict>
 			<key>hash</key>
 			<data>
-			r1aAHLsl1HqPOxOjnnlVMBT8weQ=
+			JBEnyc/hMuUv8yKvrRqvhx5Ixig=
 			</data>
 			<key>hash2</key>
 			<data>
-			D81BlAXC8IYBjKsGDu0nx8Zm3OxlDG6/r2pFvj/FY7A=
+			0/+qxdkneYdLJXPwmeikWNboQjLmWOFuWwjs5mmGq/k=
 			</data>
 		</dict>
 		<key>Windows64/MIME.html</key>
