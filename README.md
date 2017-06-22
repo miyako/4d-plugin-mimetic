@@ -6,7 +6,7 @@ Using some coee from [JaroMail](https://github.com/dyne/JaroMail) for [RFC2047](
 
 Using [libjson](https://sourceforge.net/projects/libjson/) for [JSON](http://www.json.org).
 
-Using[iconv](https://www.gnu.org/software/libiconv/).
+Using [iconv](https://www.gnu.org/software/libiconv/).
 
 ## Features
 
