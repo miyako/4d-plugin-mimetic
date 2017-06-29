@@ -2,7 +2,7 @@
 
 Another MIME parse based on [mimetic](http://www.codesink.org/mimetic_mime_library.html).
 
-Using some coee from [JaroMail](https://github.com/dyne/JaroMail) for [RFC2047](https://www.ietf.org/rfc/rfc2047.txt).
+Using some code from [JaroMail](https://github.com/dyne/JaroMail) for [RFC2047](https://www.ietf.org/rfc/rfc2047.txt).
 
 Using [libjson](https://sourceforge.net/projects/libjson/) for [JSON](http://www.json.org).
 
