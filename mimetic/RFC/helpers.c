@@ -45,7 +45,9 @@ void *safe_calloc (size_t nmemb, size_t size)
   if (!(p = calloc (nmemb, size)))
   {
     perror ("Out of memory");
+#ifndef WIN32
     sleep (1);
+#endif
     exit (1);
   }
   return p;
@@ -60,7 +62,9 @@ void *safe_malloc (unsigned int siz)
   if ((p = (void *) malloc (siz)) == 0)
   {
     perror ("Out of memory!");
+#ifndef WIN32
     sleep (1);
+#endif
     exit (1);
   }
   return (p);
@@ -91,7 +95,9 @@ void safe_realloc (void **p, size_t siz)
   if (!r)
   {
     perror ("Out of memory!");
+#ifndef WIN32
     sleep (1);
+#endif
     exit (1);
   }
 

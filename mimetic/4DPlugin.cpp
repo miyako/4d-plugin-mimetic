@@ -393,26 +393,34 @@ void getBlob(JSONNODE *body_array, Body &body, Header &header, PA_Variable *arra
 	string filename = header.contentDisposition().param("filename");
 	if(filename.length())
 	{
-		decode_header(filename);
-		json_set_text(item, L"filename", filename);
+		getHeader(item, L"filename", filename);
 	}
+	
 	string name = header.contentType().param("name");
 	if(name.length())
 	{
-		decode_header(name);
-		json_set_text(item, L"name", name);
+		getHeader(item, L"name", name);
 	}
 	
 	string mime_type = header.contentType().type();
-	string mime_subtype = header.contentType().subtype();
-	
-	if(mime_subtype.length())
+	if(mime_type.length())
 	{
-		mime_type += "/";
-		mime_type += mime_subtype;
+		getHeader(item, L"media_type", mime_type);
+		string mime_subtype = header.contentType().subtype();
+		if(mime_subtype.length())
+		{
+			getHeader(item, L"media_subtype", mime_subtype);
+			mime_type += "/";
+			mime_type += mime_subtype;
+			getHeader(item, L"mime_type", mime_type);
+		}
 	}
 	
-	getHeader(item, L"mime_type", mime_type);
+	string content_id = header.contentId().str();
+	getHeader(item, L"content_id", content_id);
+	
+	string content_encoding = header.contentTransferEncoding().str();
+	getHeader(item, L"content_encoding", content_encoding);
 	
 	json_push_back(body_array, item);
 }
@@ -420,7 +428,7 @@ void getBlob(JSONNODE *body_array, Body &body, Header &header, PA_Variable *arra
 void getText(JSONNODE *body_array, Body &body, Header &header)
 {
 	JSONNODE *item = json_new(JSON_NODE);
-	
+		
 	string charset = header.contentType().param("charset");
 	
 	string body_text = body.c_str();
@@ -509,15 +517,24 @@ void getText(JSONNODE *body_array, Body &body, Header &header)
 	json_set_text(item, L"data", (char *)body_text.c_str());
 	
 	string mime_type = header.contentType().type();
-	string mime_subtype = header.contentType().subtype();
-	
-	if(mime_subtype.length())
+	if(mime_type.length())
 	{
-		mime_type += "/";
-		mime_type += mime_subtype;
+		getHeader(item, L"media_type", mime_type);
+		string mime_subtype = header.contentType().subtype();
+		if(mime_subtype.length())
+		{
+			getHeader(item, L"media_subtype", mime_subtype);
+			mime_type += "/";
+			mime_type += mime_subtype;
+			getHeader(item, L"mime_type", mime_type);
+		}
 	}
 	
-	getHeader(item, L"mime_type", mime_type);
+	string content_id = header.contentId().str();
+	getHeader(item, L"content_id", content_id);
+	
+	string content_encoding = header.contentTransferEncoding().str();
+	getHeader(item, L"content_encoding", content_encoding);
 	
 	json_push_back(body_array, item);
 }
@@ -585,7 +602,8 @@ void processMessage(JSONNODE *n, MimeEntity *me, PA_Variable *array_blob, unsign
 	}else
 	{
 		string mime_type = header.contentType().type();
-		if(0 == strncasecmp(mime_type.c_str(), "text", 4))
+		if(0 == strncasecmp(mime_type.c_str(), "text", 4)
+			 ||(!(mime_type.length())))
 		{
 			JSONNODE *body_array = json_get(n, L"body");
 			if(!body_array)
@@ -608,6 +626,219 @@ void processMessage(JSONNODE *n, MimeEntity *me, PA_Variable *array_blob, unsign
 }
 
 #pragma mark -
+
+//https://github.com/dyne/JaroMail/blob/master/src/parsedate.c
+//https://github.com/karelzak/mutt-kz/blob/master/parse.c
+
+static const struct tz_t
+{
+	char tzname[5];
+	unsigned char zhours;
+	unsigned char zminutes;
+	unsigned char zoccident; /* west of UTC? */
+}
+TimeZones[] =
+{
+	{ "aat",   1,  0, 1 }, /* Atlantic Africa Time */
+	{ "adt",   4,  0, 0 }, /* Arabia DST */
+	{ "ast",   3,  0, 0 }, /* Arabia */
+	/*{ "ast",   4,  0, 1 },*/ /* Atlantic */
+	{ "bst",   1,  0, 0 }, /* British DST */
+	{ "cat",   1,  0, 0 }, /* Central Africa */
+	{ "cdt",   5,  0, 1 },
+	{ "cest",  2,  0, 0 }, /* Central Europe DST */
+	{ "cet",   1,  0, 0 }, /* Central Europe */
+	{ "cst",   6,  0, 1 },
+	/*{ "cst",   8,  0, 0 },*/ /* China */
+	/*{ "cst",   9, 30, 0 },*/ /* Australian Central Standard Time */
+	{ "eat",   3,  0, 0 }, /* East Africa */
+	{ "edt",   4,  0, 1 },
+	{ "eest",  3,  0, 0 }, /* Eastern Europe DST */
+	{ "eet",   2,  0, 0 }, /* Eastern Europe */
+	{ "egst",  0,  0, 0 }, /* Eastern Greenland DST */
+	{ "egt",   1,  0, 1 }, /* Eastern Greenland */
+	{ "est",   5,  0, 1 },
+	{ "gmt",   0,  0, 0 },
+	{ "gst",   4,  0, 0 }, /* Presian Gulf */
+	{ "hkt",   8,  0, 0 }, /* Hong Kong */
+	{ "ict",   7,  0, 0 }, /* Indochina */
+	{ "idt",   3,  0, 0 }, /* Israel DST */
+	{ "ist",   2,  0, 0 }, /* Israel */
+	/*{ "ist",   5, 30, 0 },*/ /* India */
+	{ "jst",   9,  0, 0 }, /* Japan */
+	{ "kst",   9,  0, 0 }, /* Korea */
+	{ "mdt",   6,  0, 1 },
+	{ "met",   1,  0, 0 }, /* this is now officially CET */
+	{ "msd",   4,  0, 0 }, /* Moscow DST */
+	{ "msk",   3,  0, 0 }, /* Moscow */
+	{ "mst",   7,  0, 1 },
+	{ "nzdt", 13,  0, 0 }, /* New Zealand DST */
+	{ "nzst", 12,  0, 0 }, /* New Zealand */
+	{ "pdt",   7,  0, 1 },
+	{ "pst",   8,  0, 1 },
+	{ "sat",   2,  0, 0 }, /* South Africa */
+	{ "smt",   4,  0, 0 }, /* Seychelles */
+	{ "sst",  11,  0, 1 }, /* Samoa */
+	/*{ "sst",   8,  0, 0 },*/ /* Singapore */
+	{ "utc",   0,  0, 0 },
+	{ "wat",   0,  0, 0 }, /* West Africa */
+	{ "west",  1,  0, 0 }, /* Western Europe DST */
+	{ "wet",   0,  0, 0 }, /* Western Europe */
+	{ "wgst",  2,  0, 1 }, /* Western Greenland DST */
+	{ "wgt",   3,  0, 1 }, /* Western Greenland */
+	{ "wst",   8,  0, 0 }, /* Western Australia */
+};
+
+void getDate(JSONNODE *n, string &date)
+{
+	struct tm tm;
+	char *s, *z;
+	int zoccident = 0;
+	int zhours = 0;
+	int zminutes = 0;
+	time_t lt;
+	
+	/* Format [weekday ,] day-of-month month year hour:minute:second timezone.
+	 Some of the ideas, sanity checks etc taken from parse.c in the mutt
+	 sources, credit to Michael R. Elkins et al
+	 */
+	
+	s = (char *)date.c_str();
+	z = strchr(s, ',');
+	if (z) s = z + 1;
+	while (*s && isspace(*s)) s++;
+	/* Should now be looking at day number */
+	if (!isdigit(*s)) goto tough_cheese;
+	tm.tm_mday = atoi(s);
+	if (tm.tm_mday > 31) goto tough_cheese;
+	
+	while (isdigit(*s)) s++;
+	while (*s && isspace(*s)) s++;
+	if (!*s) goto tough_cheese;
+	if      (!strncasecmp(s, "jan", 3)) tm.tm_mon =  0;
+	else if (!strncasecmp(s, "feb", 3)) tm.tm_mon =  1;
+	else if (!strncasecmp(s, "mar", 3)) tm.tm_mon =  2;
+	else if (!strncasecmp(s, "apr", 3)) tm.tm_mon =  3;
+	else if (!strncasecmp(s, "may", 3)) tm.tm_mon =  4;
+	else if (!strncasecmp(s, "jun", 3)) tm.tm_mon =  5;
+	else if (!strncasecmp(s, "jul", 3)) tm.tm_mon =  6;
+	else if (!strncasecmp(s, "aug", 3)) tm.tm_mon =  7;
+	else if (!strncasecmp(s, "sep", 3)) tm.tm_mon =  8;
+	else if (!strncasecmp(s, "oct", 3)) tm.tm_mon =  9;
+	else if (!strncasecmp(s, "nov", 3)) tm.tm_mon = 10;
+	else if (!strncasecmp(s, "dec", 3)) tm.tm_mon = 11;
+	else goto tough_cheese;
+	
+	while (!isspace(*s)) s++;
+	while (*s && isspace(*s)) s++;
+	if (!isdigit(*s)) goto tough_cheese;
+	tm.tm_year = atoi(s);
+	if (tm.tm_year < 70) {
+		tm.tm_year += 100;
+	} else if (tm.tm_year >= 1900) {
+		tm.tm_year -= 1900;
+	}
+	
+	tm.tm_hour = 0;
+	tm.tm_min = 0;
+	tm.tm_sec = 0;
+	tm.tm_isdst = 0;//daylight savingtime
+	tm.tm_gmtoff = 0;
+	
+	while (isdigit(*s)) s++;
+	while (*s && !isdigit(*s)) s++;
+	if (!*s) goto tough_cheese;
+	
+	/* Now looking at hms */
+	/* For now, forget this.  The searching will be vague enough that nearest day is good enough. */
+	
+	tm.tm_hour = atoi(s);
+	
+	while (isdigit(*s)) s++;
+	while (*s && !isdigit(*s)) s++;
+	if (!*s) goto tough_cheese;
+	
+	tm.tm_min = atoi(s);
+	
+	while (isdigit(*s)) s++;
+	while (*s && !isdigit(*s)) s++;
+	if (!*s) goto tough_cheese;
+	
+	tm.tm_sec = atoi(s);
+	
+	while (isdigit(*s)) s++;
+	while (*s && isspace(*s)) s++;
+	if (!*s) goto tough_cheese;
+	
+	if (*s == '+' || *s == '-')
+	{
+		if (s[1] && s[2] && s[3] && s[4]
+				&& isdigit ((unsigned char) s[1]) && isdigit ((unsigned char) s[2])
+				&& isdigit ((unsigned char) s[3]) && isdigit ((unsigned char) s[4]))
+		{
+			zhours   = (s[1] - '0') * 10 + (s[2] - '0');
+			zminutes = (s[3] - '0') * 10 + (s[4] - '0');
+			
+			if (s[0] == '-')
+				zoccident = 1;
+		}
+	}
+	
+	else
+	{
+		struct tz_t *tz;
+	
+		tz = (tz_t *)bsearch(s, TimeZones, sizeof TimeZones/sizeof (struct tz_t),
+									sizeof (struct tz_t),
+									(int (*)(const void *, const void *))strcasecmp
+									/* This is safe to do: A pointer to a struct equals
+									 * a pointer to its first element*/);
+		if (tz)
+		{
+			zhours = tz->zhours;
+			zminutes = tz->zminutes;
+			zoccident = tz->zoccident;
+		}
+		/* ad hoc support for the European MET (now officially CET) TZ */
+		if (strcasecmp (s, "MET") == 0)
+		{
+			if ((s = strtok (NULL, " \t")) != NULL)
+			{
+				if (!strcasecmp (s, "DST"))
+					zhours++;
+			}
+		}
+	}
+	
+	tm.tm_gmtoff = zhours * 3600 + zminutes * 60;
+	
+	if (!zoccident)
+		tm.tm_gmtoff = -tm.tm_gmtoff;
+	
+	char localtime[100];
+	char gmtime[100];
+	
+	if (std::strftime(gmtime, sizeof(gmtime), "%Y-%m-%dT%H:%M:%SZ", &tm))
+	{
+		string utc_date = string((const char *)gmtime);
+		getHeader(n, L"utc_date", utc_date);
+	}
+	
+	lt = timegm(&tm);
+	tm = *(std::localtime(&lt));
+	
+	if (std::strftime(localtime, sizeof(localtime), "%Y-%m-%dT%H:%M:%S%z", &tm))
+	{
+		string local_date = string((const char *)localtime);
+		getHeader(n, L"local_date", local_date);
+	}
+	
+	tough_cheese:
+	{
+	
+	}
+	
+}
 
 void MIME_PARSE_MESSAGE(PA_PluginParameters params)
 {
@@ -668,23 +899,26 @@ void MIME_PARSE_MESSAGE(PA_PluginParameters params)
 		
 		/* Content-Type */
 		
-//		string mime_type = me.header().contentType().str();
-//		getHeader(json_message, L"mime_type", mime_type);//includes charset, etc
-
 		string mime_type = me.header().contentType().type();
-		string mime_subtype = me.header().contentType().subtype();
-		
-		if(mime_subtype.length())
+		if(mime_type.length())
 		{
-			mime_type += "/";
-			mime_type += mime_subtype;
+			getHeader(json_message, L"media_type", mime_type);
+			string mime_subtype = me.header().contentType().subtype();
+			if(mime_subtype.length())
+			{
+				getHeader(json_message, L"media_subtype", mime_subtype);
+				mime_type += "/";
+				mime_type += mime_subtype;
+				getHeader(json_message, L"mime_type", mime_type);
+			}
 		}
-		
-		getHeader(json_message, L"mime_type", mime_type);
 		
 		if(me.hasField("date"))
 		{
 			string date = me.header().field("date").value();
+			
+			getDate(json_message, date);
+		
 			getHeader(json_message, L"date", date);
 		}
 		

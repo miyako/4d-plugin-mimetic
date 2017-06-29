@@ -20,6 +20,15 @@
 
 #define HAVE_ICONV 1
 
+#if defined(_WIN32)
+#define snprintf _snprintf
+#define vsnprintf _vsnprintf
+#define strcasecmp _stricmp
+#define strncasecmp _strnicmp
+#endif
+
+#include "iconv.h"
+
 extern const char *Charset;
 void rfc2047_encode_string (char *, size_t, const unsigned char *);
 void rfc2047_encode_adrlist (ADDRESS *);
