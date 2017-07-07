@@ -21,7 +21,6 @@ void PluginMain(PA_long32 selector, PA_PluginParameters params)
 				// --- MIME
 				
 			case 1 :
-//				PA_RunInMainProcess((PA_RunInMainProcessProcPtr)MIME_PARSE_MESSAGE, params);
 				MIME_PARSE_MESSAGE(params);
 				break;
 				
@@ -150,9 +149,17 @@ void json_set_text(JSONNODE *n, const wchar_t *name, char *value)
 {
 	if(n)
 	{
-		std::wstring w32;
-		json_conv(value, w32);
-		json_push_back(n, json_new_a(name, w32.c_str()));
+		if(value)
+		{
+			std::wstring w32;
+			json_conv(value, w32);
+			json_push_back(n, json_new_a(name, w32.c_str()));
+		}else
+		{
+			JSONNODE *node = json_new_a(name, L"");
+			json_nullify(node);
+			json_push_back(n, node);
+		}
 	}
 }
 
@@ -308,6 +315,9 @@ void getAddress(JSONNODE *n, const wchar_t *name, AddressList &addresses)
 				getAddress(address_array, address);
 			}
 			json_set_object(n, name, address_array);
+		}else
+		{
+			json_set_object(n, name, json_new(JSON_ARRAY));
 		}
 	}
 }
@@ -328,6 +338,9 @@ void getAddress(JSONNODE *n, const wchar_t *name, MailboxList &addresses)
 				getMailbox(address_array, address);
 			}
 			json_set_object(n, name, address_array);
+		}else
+		{
+			json_set_object(n, name, json_new(JSON_ARRAY));
 		}
 	}
 }
@@ -346,6 +359,9 @@ void getAddress(JSONNODE *n, const wchar_t *name, Mailbox &mailbox)
 			getMailbox(address_array, address);
 			
 			json_set_object(n, name, address_array);
+		}else
+		{
+			json_set_object(n, name, json_new(JSON_ARRAY));
 		}
 	}
 }
@@ -394,12 +410,22 @@ void getBlob(JSONNODE *body_array, Body &body, Header &header, PA_Variable *arra
 	if(filename.length())
 	{
 		getHeader(item, L"filename", filename);
+	}else
+	{
+		JSONNODE *node = json_new_a(L"filename", L"");
+		json_nullify(node);
+		json_push_back(item, node);
 	}
 	
 	string name = header.contentType().param("name");
 	if(name.length())
 	{
 		getHeader(item, L"name", name);
+	}else
+	{
+		JSONNODE *node = json_new_a(L"name", L"");
+		json_nullify(node);
+		json_push_back(item, node);
 	}
 	
 	string mime_type = header.contentType().type();
@@ -413,7 +439,21 @@ void getBlob(JSONNODE *body_array, Body &body, Header &header, PA_Variable *arra
 			mime_type += "/";
 			mime_type += mime_subtype;
 			getHeader(item, L"mime_type", mime_type);
+		}else
+		{
+			JSONNODE *node = json_new_a(L"media_subtype", L"");
+			json_nullify(node);
+			json_push_back(item, node);
+			getHeader(item, L"mime_type", mime_type);
 		}
+	}else
+	{
+		JSONNODE *node = json_new_a(L"mime_type", L"");
+		json_nullify(node);
+		json_push_back(item, node);
+		node = json_new_a(L"media_subtype", L"");
+		json_nullify(node);
+		json_push_back(item, node);
 	}
 	
 	string content_id = header.contentId().str();
@@ -527,7 +567,21 @@ void getText(JSONNODE *body_array, Body &body, Header &header)
 			mime_type += "/";
 			mime_type += mime_subtype;
 			getHeader(item, L"mime_type", mime_type);
+		}else
+		{
+			JSONNODE *node = json_new_a(L"media_subtype", L"");
+			json_nullify(node);
+			json_push_back(item, node);
+			getHeader(item, L"mime_type", mime_type);
 		}
+	}else
+	{
+		JSONNODE *node = json_new_a(L"mime_type", L"");
+		json_nullify(node);
+		json_push_back(item, node);
+		node = json_new_a(L"media_subtype", L"");
+		json_nullify(node);
+		json_push_back(item, node);
 	}
 	
 	string content_id = header.contentId().str();
@@ -570,11 +624,11 @@ void processMessage(JSONNODE *n, MimeEntity *me, PA_Variable *array_blob, unsign
 				if((0 == strncasecmp(content_disposition.c_str(), "attachment", 10))||(level > 1))
 				{
 					//attachment or not top level
-					JSONNODE *attachment_array = json_get(n, L"attachment");
+					JSONNODE *attachment_array = json_get(n, L"attachments");
 					if(!attachment_array)
 					{
 						attachment_array = json_new(JSON_ARRAY);
-						json_set_object(n, L"attachment", attachment_array);
+						json_set_object(n, L"attachments", attachment_array);
 					}
 					getBlob(attachment_array, part_body, part_header, array_blob);
 				}else if(0 == strncasecmp(mime_type.c_str(), "text", 4))
@@ -589,11 +643,11 @@ void processMessage(JSONNODE *n, MimeEntity *me, PA_Variable *array_blob, unsign
 				}else
 				{
 					//not text
-					JSONNODE *attachment_array = json_get(n, L"attachment");
+					JSONNODE *attachment_array = json_get(n, L"attachments");
 					if(!attachment_array)
 					{
 						attachment_array = json_new(JSON_ARRAY);
-						json_set_object(n, L"attachment", attachment_array);
+						json_set_object(n, L"attachments", attachment_array);
 					}
 				}
 			}
@@ -602,8 +656,7 @@ void processMessage(JSONNODE *n, MimeEntity *me, PA_Variable *array_blob, unsign
 	}else
 	{
 		string mime_type = header.contentType().type();
-		if(0 == strncasecmp(mime_type.c_str(), "text", 4)
-			 ||(!(mime_type.length())))
+		if(0 == strncasecmp(mime_type.c_str(), "text", 4)||(!(mime_type.length())))
 		{
 			JSONNODE *body_array = json_get(n, L"body");
 			if(!body_array)
@@ -615,11 +668,11 @@ void processMessage(JSONNODE *n, MimeEntity *me, PA_Variable *array_blob, unsign
 		}else
 		{
 			//not text
-			JSONNODE *attachment_array = json_get(n, L"attachment");
+			JSONNODE *attachment_array = json_get(n, L"attachments");
 			if(!attachment_array)
 			{
 				attachment_array = json_new(JSON_ARRAY);
-				json_set_object(n, L"attachment", attachment_array);
+				json_set_object(n, L"attachments", attachment_array);
 			}
 		}
 	}
@@ -743,7 +796,9 @@ void getDate(JSONNODE *n, string &date)
 	tm.tm_min = 0;
 	tm.tm_sec = 0;
 	tm.tm_isdst = 0;//daylight savingtime
+#ifndef WIN32
 	tm.tm_gmtoff = 0;
+#endif
 	
 	while (isdigit(*s)) s++;
 	while (*s && !isdigit(*s)) s++;
@@ -810,10 +865,16 @@ void getDate(JSONNODE *n, string &date)
 		}
 	}
 	
+#ifndef WIN32
 	tm.tm_gmtoff = zhours * 3600 + zminutes * 60;
+#endif
 	
 	if (!zoccident)
+	{
+#ifndef WIN32
 		tm.tm_gmtoff = -tm.tm_gmtoff;
+#endif
+	}
 	
 	char localtime[100];
 	char gmtime[100];
@@ -823,19 +884,44 @@ void getDate(JSONNODE *n, string &date)
 		string utc_date = string((const char *)gmtime);
 		getHeader(n, L"utc_date", utc_date);
 	}
-	
+#ifndef WIN32
 	lt = timegm(&tm);
+#else
+	lt =_mkgmtime(&tm);
+#ifdef WIN32
+	time_t utc = lt;
+#endif
+#endif
 	tm = *(std::localtime(&lt));
-	
+#ifndef WIN32
 	if (std::strftime(localtime, sizeof(localtime), "%Y-%m-%dT%H:%M:%S%z", &tm))
-	{
-		string local_date = string((const char *)localtime);
-		getHeader(n, L"local_date", local_date);
-	}
+#else
+		if (std::strftime(localtime, sizeof(localtime), "%Y-%m-%dT%H:%M:%S", &tm))
+#endif
+		{
+			string local_date = string((const char *)localtime);
+#ifdef WIN32
+			time_t localtime =_mkgmtime(&tm);
+			time_t offset = utc - localtime;
+			zhours = abs(offset / 3600);
+			zminutes = abs(offset % 3600);
+			zoccident = (offset <=0);
+			char tz[8];
+			if (!zoccident)
+			{
+				sprintf(tz, "-%02d%02d", zhours, zminutes);
+			}else
+			{
+				sprintf(tz, "+%02d%02d", zhours, zminutes);
+			}
+			local_date += tz;
+#endif
+			getHeader(n, L"local_date", local_date);
+		}
 	
 	tough_cheese:
 	{
-	
+		
 	}
 	
 }
@@ -910,21 +996,50 @@ void MIME_PARSE_MESSAGE(PA_PluginParameters params)
 				mime_type += "/";
 				mime_type += mime_subtype;
 				getHeader(json_message, L"mime_type", mime_type);
+			}else
+			{
+				JSONNODE *node = json_new_a(L"media_subtype", L"");
+				json_nullify(node);
+				json_push_back(json_message, node);
+				getHeader(json_message, L"mime_type", mime_type);
 			}
+		}else
+		{
+			JSONNODE *node = json_new_a(L"media_type", L"");
+			json_nullify(node);
+			json_push_back(json_message, node);
+			node = json_new_a(L"media_subtype", L"");
+			json_nullify(node);
+			json_push_back(json_message, node);
 		}
 		
 		if(me.hasField("date"))
 		{
 			string date = me.header().field("date").value();
-			
 			getDate(json_message, date);
-		
 			getHeader(json_message, L"date", date);
+		}else
+		{
+			JSONNODE *node = json_new_a(L"date", L"");
+			json_nullify(node);
+			json_push_back(json_message, node);
 		}
 		
 		processMessage(json_message, &me, &Param3, 0);
 		
 		PA_UnlockHandle(h);
+	}
+	
+	JSONNODE *attachment_array = json_get(json_message, L"attachments");
+	if(!attachment_array)
+	{
+		json_set_object(json_message, L"attachments", json_new(JSON_ARRAY));
+	}
+	
+	JSONNODE *body_array = json_get(json_message, L"body");
+	if(!body_array)
+	{
+		json_set_object(json_message, L"body", json_new(JSON_ARRAY));
 	}
 	
 	json_set_object(json, L"message", json_message);
@@ -938,19 +1053,19 @@ void MIME_PARSE_MESSAGE(PA_PluginParameters params)
 
 void MIME_Create_message(PA_PluginParameters params)
 {
-	PackagePtr pParams = (PackagePtr)params->fParameters;
-	PA_Variable *data_array_p = ((PA_Variable *)pParams[1]);//Param2
-	
-	C_TEXT Param1;
-	Param1.fromParamAtIndex(pParams, 1);
-	JSONNODE *json = json_parse_text_param(Param1);
-	
-	if(json)
-	{
+	/*
+	 PackagePtr pParams = (PackagePtr)params->fParameters;
+	 PA_Variable *data_array_p = ((PA_Variable *)pParams[1]);//Param2
+	 
+	 C_TEXT Param1;
+	 Param1.fromParamAtIndex(pParams, 1);
+	 JSONNODE *json = json_parse_text_param(Param1);
+	 
+	 if(json)
+	 {
 		json_delete(json);
-	}
-	
-	PA_ReturnBlob(params, NULL, 0);
-
+	 }
+	 
+	 PA_ReturnBlob(params, NULL, 0);
+	 */
 }
-
