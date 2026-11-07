@@ -70,8 +70,8 @@ int Index_64[128] = {
 #define IsPrint(c) (isprint((unsigned char)(c)) || \
 	((unsigned char)(c) >= 0xa0))
 
-#define hexval(c) Index_hex[(unsigned int)(c)]
-#define base64val(c) Index_64[(unsigned int)(c)]
+#define hexval(c) (((unsigned char)(c) < 128) ? Index_hex[(unsigned char)(c)] : -1)
+#define base64val(c) (((unsigned char)(c) < 128) ? Index_64[(unsigned char)(c)] : -1)
 
 static int rfc2047_decode_word (char *d, const char *s, size_t dlen)
 {
@@ -106,7 +106,14 @@ static int rfc2047_decode_word (char *d, const char *s, size_t dlen)
 	else if (toupper (*pp) == 'B')
 	  enc = ENCBASE64;
 	else
+	{
+	  safe_free (&p);
+#ifdef HAVE_ICONV
+	  if (filter)
+	    safe_free (&fromcharset);
+#endif
 	  return (-1);
+	}
 	break;
       case 4:
 	if (enc == ENCQUOTEDPRINTABLE)
@@ -120,6 +127,8 @@ static int rfc2047_decode_word (char *d, const char *s, size_t dlen)
 	    }
 	    else if (*pp == '=')
 	    {
+	      if (!pp[1] || !pp[2])
+	        break; /* truncated escape: stop instead of reading past the NUL */
 	      *pd++ = (hexval(pp[1]) << 4) | hexval(pp[2]);
 	      len--;
 	      pp += 2;
@@ -137,19 +146,21 @@ static int rfc2047_decode_word (char *d, const char *s, size_t dlen)
 	{
 	  while (*pp && len > 0)
 	  {
+	    if (!pp[1])
+	      break; /* truncated quantum */
 	    c1 = base64val(pp[0]);
 	    c2 = base64val(pp[1]);
 	    *pd++ = (c1 << 2) | ((c2 >> 4) & 0x3);
 	    if (--len == 0) break;
 	    
-	    if (pp[2] == '=') break;
+	    if (!pp[2] || pp[2] == '=') break;
 
 	    c3 = base64val(pp[2]);
 	    *pd++ = ((c2 & 0xf) << 4) | ((c3 >> 2) & 0xf);
 	    if (--len == 0)
 	      break;
 
-	    if (pp[3] == '=')
+	    if (!pp[3] || pp[3] == '=')
 	      break;
 
 	    c4 = base64val(pp[3]);
@@ -189,7 +200,7 @@ static int rfc2047_decode_word (char *d, const char *s, size_t dlen)
       len = dlen;
       while (*pd && iconv (cd, &pp, &in, &pd, &len) == (size_t)(-1))
       {
-	if (errno == E2BIG)
+	if (errno == E2BIG || len < 2 || in == 0)
 	  break;
 
 	*pd = '?';

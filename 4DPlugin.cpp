@@ -398,7 +398,7 @@ void getBlob(JSONNODE *body_array, Body &body, Header &header, PA_Variable *arra
 	
 	PA_long32 i = PA_GetArrayNbElements(*(array_blob));
 	PA_ResizeArray(array_blob, ++i);
-	PA_Variable element = PA_CreateVariable(eVK_Blob);
+	PA_Variable element = PA_CreateVariable(eVK_Undefined);//eVK_Blob would allocate a handle that the next line leaks
 	PA_SetBlobVariable(&element, (void *)decoded.data(), (PA_long32)decoded.size());
 	PA_SetBlobInArray(*(array_blob), i, element.uValue.fBlob);
 	
@@ -513,21 +513,36 @@ void getText(JSONNODE *body_array, Body &body, Header &header)
 		
 #if 1
 			//incremental iconv
-			//dst
-			size_t dst_len = src_len;//start buffer size
+			//dst (never empty: &dst.at(0) on an empty vector throws)
+			size_t dst_len = src_len + ICONV_BUFFER_SIZE;//start buffer size
 			size_t outbytesleft = dst_len;
 			vector<char> dst(dst_len);
-			size_t pos = 0;
-			char *outbuf = &dst.at(pos);
+			char *outbuf = &dst.at(0);
 			
 			while(iconv (cd, &inbytes, &inbytesleft, &outbuf, &outbytesleft) == (size_t)(-1))
 			{
-				size_t growth = dst_len - outbytesleft;
-				pos += growth;
-				dst_len += ICONV_BUFFER_SIZE;
-				outbytesleft += ICONV_BUFFER_SIZE;
-				dst.resize(dst_len);
-				outbuf = &dst.at(pos);
+				int err = errno;
+				if((err == E2BIG) || ((err == EILSEQ) && (outbytesleft == 0)))
+				{
+					//output buffer full: grow it and resume at the current write position
+					size_t pos = dst_len - outbytesleft;
+					dst_len += ICONV_BUFFER_SIZE;
+					outbytesleft += ICONV_BUFFER_SIZE;
+					dst.resize(dst_len);
+					outbuf = &dst.at(pos);
+				}else if((err == EILSEQ) && (inbytesleft > 0))
+				{
+					//invalid byte for this charset: iconv does not advance past it,
+					//so emit '?' and skip it instead of looping forever
+					*outbuf++ = '?';
+					outbytesleft--;
+					inbytes++;
+					inbytesleft--;
+				}else
+				{
+					//EINVAL (incomplete sequence at the end of the input) or other error
+					break;
+				}
 			}
 			
 			body_text = string(&dst.at(0), (dst.size() - outbytesleft));
@@ -744,7 +759,7 @@ TimeZones[] =
 
 void getDate(JSONNODE *n, string &date)
 {
-	struct tm tm;
+	struct tm tm = {};
 	char *s, *z;
 	int zoccident = 0;
 	int zhours = 0;
@@ -759,14 +774,14 @@ void getDate(JSONNODE *n, string &date)
 	s = (char *)date.c_str();
 	z = strchr(s, ',');
 	if (z) s = z + 1;
-	while (*s && isspace(*s)) s++;
+	while (*s && isspace((unsigned char)*s)) s++;
 	/* Should now be looking at day number */
-	if (!isdigit(*s)) goto tough_cheese;
+	if (!isdigit((unsigned char)*s)) goto tough_cheese;
 	tm.tm_mday = atoi(s);
 	if (tm.tm_mday > 31) goto tough_cheese;
 	
-	while (isdigit(*s)) s++;
-	while (*s && isspace(*s)) s++;
+	while (isdigit((unsigned char)*s)) s++;
+	while (*s && isspace((unsigned char)*s)) s++;
 	if (!*s) goto tough_cheese;
 	if      (!strncasecmp(s, "jan", 3)) tm.tm_mon =  0;
 	else if (!strncasecmp(s, "feb", 3)) tm.tm_mon =  1;
@@ -782,9 +797,9 @@ void getDate(JSONNODE *n, string &date)
 	else if (!strncasecmp(s, "dec", 3)) tm.tm_mon = 11;
 	else goto tough_cheese;
 	
-	while (!isspace(*s)) s++;
-	while (*s && isspace(*s)) s++;
-	if (!isdigit(*s)) goto tough_cheese;
+	while (*s && !isspace((unsigned char)*s)) s++;
+	while (*s && isspace((unsigned char)*s)) s++;
+	if (!isdigit((unsigned char)*s)) goto tough_cheese;
 	tm.tm_year = atoi(s);
 	if (tm.tm_year < 70) {
 		tm.tm_year += 100;
@@ -800,8 +815,8 @@ void getDate(JSONNODE *n, string &date)
 	tm.tm_gmtoff = 0;
 #endif
 	
-	while (isdigit(*s)) s++;
-	while (*s && !isdigit(*s)) s++;
+	while (isdigit((unsigned char)*s)) s++;
+	while (*s && !isdigit((unsigned char)*s)) s++;
 	if (!*s) goto tough_cheese;
 	
 	/* Now looking at hms */
@@ -809,20 +824,20 @@ void getDate(JSONNODE *n, string &date)
 	
 	tm.tm_hour = atoi(s);
 	
-	while (isdigit(*s)) s++;
-	while (*s && !isdigit(*s)) s++;
+	while (isdigit((unsigned char)*s)) s++;
+	while (*s && !isdigit((unsigned char)*s)) s++;
 	if (!*s) goto tough_cheese;
 	
 	tm.tm_min = atoi(s);
 	
-	while (isdigit(*s)) s++;
-	while (*s && !isdigit(*s)) s++;
+	while (isdigit((unsigned char)*s)) s++;
+	while (*s && !isdigit((unsigned char)*s)) s++;
 	if (!*s) goto tough_cheese;
 	
 	tm.tm_sec = atoi(s);
 	
-	while (isdigit(*s)) s++;
-	while (*s && isspace(*s)) s++;
+	while (isdigit((unsigned char)*s)) s++;
+	while (*s && isspace((unsigned char)*s)) s++;
 	if (!*s) goto tough_cheese;
 	
 	if (*s == '+' || *s == '-')
@@ -854,15 +869,10 @@ void getDate(JSONNODE *n, string &date)
 			zminutes = tz->zminutes;
 			zoccident = tz->zoccident;
 		}
-		/* ad hoc support for the European MET (now officially CET) TZ */
-		if (strcasecmp (s, "MET") == 0)
-		{
-			if ((s = strtok (NULL, " \t")) != NULL)
-			{
-				if (!strcasecmp (s, "DST"))
-					zhours++;
-			}
-		}
+		/* the "MET DST" special case of the original code called
+		 strtok(NULL, ...) without a prior strtok() on this string, which is
+		 undefined behaviour; it could only run when s was exactly "MET", in
+		 which case nothing follows, so it is dropped */
 	}
 	
 #ifndef WIN32
@@ -892,7 +902,11 @@ void getDate(JSONNODE *n, string &date)
 	time_t utc = lt;
 #endif
 #endif
-	tm = *(std::localtime(&lt));
+	{
+		struct tm *ltm = std::localtime(&lt);
+		if (!ltm) goto tough_cheese; /* out-of-range year */
+		tm = *ltm;
+	}
 #ifndef WIN32
 	if (std::strftime(localtime, sizeof(localtime), "%Y-%m-%dT%H:%M:%S%z", &tm))
 #else
@@ -943,6 +957,10 @@ void MIME_PARSE_MESSAGE(PA_PluginParameters params)
 	if(h)//	the handle could be NULL if the BLOB is empty on windows
 	{
 		istringstream ss(string(PA_LockHandle(h), PA_GetHandleSize(h)));
+		PA_UnlockHandle(h);//the data was copied into ss
+		
+		try
+		{
 		istreambuf_iterator<char> bit(ss), eit;
 		MimeEntity me(bit, eit);
 		
@@ -1027,7 +1045,11 @@ void MIME_PARSE_MESSAGE(PA_PluginParameters params)
 		
 		processMessage(json_message, &me, &Param3, 0);
 		
-		PA_UnlockHandle(h);
+		}
+		catch(...)
+		{
+			//keep what was parsed so far; the outputs below are still set
+		}
 	}
 	
 	JSONNODE *attachment_array = json_get(json_message, L"attachments");
@@ -1047,7 +1069,7 @@ void MIME_PARSE_MESSAGE(PA_PluginParameters params)
 
 	json_delete(json);
 	
-	PA_SetVariableParameter(params, 3, Param3, 0);
+	PA_SetVariableParameter(params, 3, Param3, 1);//1: dispose the array previously held by the 4D variable
 	Param2.toParamAtIndex(pParams, 2);
 }
 
