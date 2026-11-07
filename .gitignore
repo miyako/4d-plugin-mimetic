@@ -4,3 +4,4 @@ build/
 *.4dbase/userPreferences.*/
 MIME.4dbase/Plugins/MIME.bundle/Contents/MacOS/
 MIME.4dbase/Plugins/MIME.bundle/Contents/_CodeSignature/
+/stdc/a/libjson.a

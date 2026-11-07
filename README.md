@@ -16,7 +16,7 @@ Only parsing is implemented. The second command in the plugin, `MIME Create mess
 ## Requirements & platform notes
 
 - **macOS 11.5 or later** for a binary built from the current Xcode project.
-- **Release status.** The project version is `14.3.0`; no GitHub release has been published yet. A universal macOS build currently stops at link time because the vendored `stdc/a/libjson.a` has no arm64 slice (and is built against the old libstdc++). Until it is rebuilt or replaced, the macOS binary cannot be produced from this repository.
+- **Building on macOS.** `stdc/a/libjson.a` is not committed: run `scripts/build-macos-deps.sh` once before building in Xcode. It downloads the pinned libjson 7.6.1 release (checksum-verified) and compiles it as a universal libc++ archive with the committed `include/libjson` headers. The release workflow does the same, with a cache.
 - **The Windows binary is the old prebuilt one.** `MIME.4dbase/Plugins/MIME.bundle/Contents/Windows64/MIME.4DX` was built from an earlier version of the source and does not contain the fixes marked *(since 14.3.0)* below.
 - **Not thread-safe.** The manifest does not declare the commands thread-safe, so 4D does not run them in a preemptive process.
 - **Failures are silent.** Neither command raises a 4D error. A message mimetic cannot make sense of produces a JSON object with empty or `null` properties; read [Error handling & troubleshooting](#error-handling--troubleshooting) before relying on a property being present.
@@ -246,7 +246,7 @@ The command is declared in the manifest, but its implementation is empty: it rea
 - **Wrong time in `utc_date` / `local_date`.** They ignore the header's zone offset; use `date`.
 - **Memory grows with every call (older builds).** Builds before 14.3.0 never released the array previously held by the `data` variable, nor an empty BLOB handle per attachment. Fixed *(since 14.3.0)*.
 - **4D quits when memory runs out.** The RFC 2047 helper calls `exit()` when `malloc` fails, which ends the 4D process instead of failing the command.
-- **The macOS build fails with `fat file missing arch 'arm64'` on `libjson.a`.** See [Requirements & platform notes](#requirements--platform-notes): `stdc/a/libjson.a` must be rebuilt as a universal libc++ archive, or replaced.
+- **The macOS build fails with `library 'json' not found` (or `no such file` on `libjson.a`).** Run `scripts/build-macos-deps.sh` first; see [Requirements & platform notes](#requirements--platform-notes).
 
 ---
 

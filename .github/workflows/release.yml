@@ -77,6 +77,29 @@ jobs:
         with:
           ref: ${{ needs.version.outputs.tag }}
 
+      # libjson.a is built from the pinned libjson 7.6.1 release (universal,
+      # libc++); restore it from the cache, build on a miss, and save right away
+      # so a later signing failure doesn't throw the build away.
+      - name: restore prebuilt libraries
+        id: deps-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: stdc/a/libjson.a
+          key: macos-deps-${{ hashFiles('scripts/build-macos-deps.sh') }}
+
+      - name: build prebuilt libraries (cache miss)
+        if: steps.deps-cache.outputs.cache-hit != 'true'
+        env:
+          MACOSX_DEPLOYMENT_TARGET: ${{ env.MACOS_DEPLOYMENT_TARGET }}
+        run: scripts/build-macos-deps.sh stdc/a
+
+      - name: save prebuilt libraries
+        if: steps.deps-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: stdc/a/libjson.a
+          key: macos-deps-${{ hashFiles('scripts/build-macos-deps.sh') }}
+
       - name: check prebuilt libraries
         run: |
           set -euo pipefail
